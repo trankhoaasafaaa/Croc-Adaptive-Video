@@ -1,3 +1,0 @@
-sender=0 receiver=0
-b99d24ea45df0f4b9d441507923a3c5afae390e645cfa7fe96a23277ad8a072d  smoke/send/check.txt
-b99d24ea45df0f4b9d441507923a3c5afae390e645cfa7fe96a23277ad8a072d  smoke/recv/check.txt
