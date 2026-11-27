@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shutil
 import signal
 import socket
 import subprocess
@@ -231,13 +232,20 @@ def run_case(args, case, repeat, profile, method, minimum=0, answer=None, deadli
                 send += ["--video-variant", f"{h}=video-{h}.mp4"]
         else:
             send += [f"video-{fixed}.mp4"]
+        sender_refuses = case == "sender-refuse"
+        if sender_refuses:
+            send.insert(1, "--ask")
         receive = [receiver_bin, "--ip", f"{RELAY}:{pair[0]}", "--disable-clipboard", "--yes"]
         if minimum:
             receive += ["--video-min-height", str(minimum)]
 
-        sender = subprocess.Popen(send, env=env, cwd=args.fixtures, stdin=subprocess.DEVNULL,
+        sender = subprocess.Popen(send, env=env, cwd=args.fixtures,
+                                  stdin=subprocess.PIPE if sender_refuses else subprocess.DEVNULL,
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         stack.callback(stop_process, sender)
+        if sender_refuses:
+            sender.stdin.write(b"n\n")
+            sender.stdin.close()
         receiver = subprocess.Popen(receive, env=env, cwd=destination, stdin=subprocess.PIPE,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         stack.callback(stop_process, receiver)
@@ -283,10 +291,15 @@ def run_case(args, case, repeat, profile, method, minimum=0, answer=None, deadli
         sha_match = bool(dst_hash and src_hash == dst_hash)
         success = not timed_out and sender.returncode == receiver.returncode == 0 and sha_match
 
+        if success and args.keep_received:
+            saved = args.keep_received / profile / method / str(repeat)
+            saved.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(destination / filename, saved / filename)
+
         joined = sender_output + receiver_output
         error_signatures = (
             b"no variant fits the video deadline", b"no variant meets the receiver's minimum height",
-            b"receiver declined the selected video", b"incompatible peer", b"probe timed out",
+            b"receiver declined the selected video", b"sender declined the selected video", b"incompatible peer", b"probe timed out",
             b"transfer canceled", b"context canceled", b"transfer disconnected", b"session interrupted",
         )
         status = "ok" if success else "timeout" if timed_out else next(
@@ -306,6 +319,12 @@ def run_case(args, case, repeat, profile, method, minimum=0, answer=None, deadli
             passed = success and (case != "benchmark" or not sender_adaptive or height == expected_height)
             if case == "late-accept":
                 passed = passed and height == 360 and decision[4] == b"true" and b"Accept after deadline" in receiver_output
+        elif sender_refuses:
+            # The receiver may observe disconnection before the refusal
+            # diagnostic crosses the relay. It must still exit with an error.
+            passed = (not timed_out and not sha_match and proxy.data_bytes < 4096
+                      and sender.returncode == receiver.returncode == 1
+                      and b"sender declined the selected video" in sender_output)
         elif fault in ("disconnect", "cancel"):
             passed = (not success and not timed_out and not sha_match and proxy.fault_event.is_set()
                       and (sender.returncode != 0 and receiver.returncode != 0))
@@ -333,6 +352,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ("baseline", "adaptive", "fixtures", "output"):
         parser.add_argument("--" + key, required=True, type=lambda p: str(Path(p).resolve()))
+    parser.add_argument("--keep-received", type=Path, help="save verified output videos under this directory")
     parser.add_argument("--suite", choices=("demo", "integration", "benchmark"), default="demo")
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--workers", type=int, default=4)
@@ -357,6 +377,7 @@ def main():
             ("late-accept", 1, "fast", "adaptive", 360, b"y\n", 1),
             ("late-refuse", 1, "fast", "adaptive", 360, b"n\n", 1),
             ("late-empty", 1, "fast", "adaptive", 360, b"\n", 1),
+            ("sender-refuse", 1, "fast", "adaptive", 0, b"y\n"),
             ("old-peer", 1, "fast", "adaptive"),
             ("mixed", 1, "fast", "mixed"),
             ("probe-timeout", 1, "fast", "adaptive", 0, None, 2, "probe-timeout"),
@@ -376,8 +397,13 @@ def main():
                     writer.writeheader()
                 writer.writerow(row)
                 stream.flush()
-                print(f"{row['case']} {row['profile']} {row['method']} n={row['repeat']} "
-                      f"height={row['height']} {row['status']} passed={row['passed']}", flush=True)
+                if args.suite == "demo" and row["status"] == "ok":
+                    print(f"{row['mbps']:g} Mb/s | {row['height']}p | "
+                          f"ETA {row['eta_s']:.2f}s | nhận xong {row['budget_elapsed_s']:.2f}s / "
+                          f"{row['deadline_s']:g}s | {row['files']} | SHA-256 khớp", flush=True)
+                else:
+                    print(f"{row['case']} {row['profile']} {row['method']} n={row['repeat']} "
+                          f"height={row['height']} {row['status']} passed={row['passed']}", flush=True)
                 valid = valid and row["passed"]
     return 0 if valid else 1
 

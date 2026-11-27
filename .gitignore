@@ -41,3 +41,6 @@ tmp/
 /src/webassets/dist/*
 !/src/webassets/dist/.gitkeep
 croc2
+
+# Local adaptive video demo runs
+/.croc-demo/

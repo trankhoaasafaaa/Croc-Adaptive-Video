@@ -4,21 +4,19 @@ Gửi đúng một phiên bản MP4 qua relay Croc. Sau khi hai đầu CLI xác 
 
 Dự án dùng Croc **v11.6.6**, commit `440ed73844fd02a8185e6e6d2d4cd772388587dc`. Cờ adaptive chỉ có tác dụng khi người gửi bật. Luồng gửi tệp thông thường vẫn dùng giao thức Croc. Mã nguồn và nội dung gốc theo [README upstream](README.upstream.md), [MIT License](LICENSE) và [thông báo bên thứ ba](THIRD_PARTY_NOTICES.md).
 
-## Chạy thử trên một máy Linux
+## Demo trên một máy Linux hoặc Windows qua WSL
 
-Cần Go 1.27.3, Git, Python 3.11 trở lên, FFmpeg với libx264 và FFprobe. Gói nộp có source ở thư mục `croc-adaptive-video/` sau khi giải nén. Chạy tại gốc source và đặt `baseline` song song với source hiện tại.
+Trong terminal Linux hoặc WSL, chuẩn bị Go 1.27.3, Python 3.11 trở lên, FFmpeg có encoder `libx264` và FFprobe. Sau khi clone, đứng tại thư mục có `go.mod` và chạy:
 
 ```bash
-git clone --branch v11.6.6 --single-branch https://github.com/schollz/croc.git ../baseline
-git -C ../baseline rev-parse HEAD
-(cd ../baseline && go build -o ../croc-baseline .)
-go build -buildvcs=false -o ../croc-adaptive .
-scripts/adaptive-video/fixtures.sh ../video-fixtures
-python3 scripts/adaptive-video/demo.py --baseline ../croc-baseline \
-  --adaptive ../croc-adaptive --fixtures ../video-fixtures --output demo.csv
+bash scripts/adaptive-video/run-demo.sh
 ```
 
-Script chạy một relay Croc gốc và hai CLI riêng cho mỗi lượt. Ba profile dự kiến lần lượt chọn 1080p, 360p và 144p. CSV lưu ETA, thời gian nhận thực tế, tên tệp duy nhất và SHA-256. Dùng `--suite benchmark --profiles medium --repeats 1` để đối chiếu 1080p cố định, 144p cố định và adaptive trên cùng băng thông 5 Mb/s. Lệnh cho ba thiết bị và PowerShell có trong [hướng dẫn thiết lập](docs/SETUP_GUIDE.md).
+Lệnh tự build CLI, tạo ba bản của cùng video, chạy relay và hai CLI riêng trên loopback. Proxy đặt ba mức băng thông **25 / 5 / 1,2 Mb/s** để thử việc tự chọn **1080p / 360p / 144p** với deadline 20 giây. Cả ba tiến trình dùng cùng bản build. Lệnh `relay` dùng relay Croc sẵn có.
+
+Khi trình bày, chỉ ra dòng có băng thông, chất lượng được chọn, ETA, thời gian nhận thực tế và SHA-256. Mở thư mục `received` trong đường dẫn chương trình in ở cuối để phát tệp nhận được. Mỗi mức mạng có thư mục riêng và chỉ nhận một bản MP4. Thời gian chạy lần đầu phụ thuộc vào tải module Go và tốc độ build. Sau khi có dependency, cả ba phiên demo đi qua loopback.
+
+Muốn thử lời nhắc nhận, dùng video tự chọn hoặc chạy giữa các máy, xem [hướng dẫn thiết lập](docs/SETUP_GUIDE.md). Các lệnh chạy đối chứng với Croc gốc nằm trong [hướng dẫn kiểm thử](docs/TESTING.md).
 
 ## Cờ adaptive
 
@@ -28,4 +26,4 @@ Script chạy một relay Croc gốc và hai CLI riêng cho mỗi lượt. Ba pr
 | `--video-variant '360=video 360.mp4'` | Sau `send`, lặp 2–16 lần | Khai báo chiều cao và đường dẫn đến bản MP4 đã tạo sẵn |
 | `--video-min-height 360` | Cờ global ở CLI nhận | Giữ ngưỡng 360p. Nếu bản đủ ngưỡng đều trễ, bắt buộc nhập `y` hoặc `yes` |
 
-Deadline phục vụ quyết định chọn bản. Tốc độ data có thể thay đổi sau probe. Xem [kiến trúc và giới hạn](docs/ARCHITECTURE.md), [lệnh kiểm thử](docs/TESTING.md), [báo cáo kết quả](docs/IMPLEMENTATION_REPORT.md) và [kịch bản demo](docs/DEMO_SCRIPT.md).
+Deadline phục vụ quyết định chọn bản. Tốc độ data có thể thay đổi sau probe. Xem [kiến trúc và giới hạn](docs/ARCHITECTURE.md) và [cách chạy thử trên LAN](docs/SETUP_GUIDE.md).

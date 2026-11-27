@@ -1,69 +1,46 @@
-# Testing
+# Kiểm thử
 
-## Transfer Update Checks
+## Lệnh build và test
 
-Send- and receive-side release checks are normally cached for 24 hours. Set
-`CROC_DO_CHECK=1` to bypass a fresh cache, wait for a release request before the
-transfer starts, and report whether a newer release is available:
+Các lệnh dưới đây chạy bằng Go 1.27.3 trên Linux x86-64. Nếu môi trường có proxy cấu hình sẵn, bỏ các biến proxy khi chạy test loopback. Croc CLI có thể đọc `HTTP_PROXY` thành proxy riêng và ép test store gửi qua proxy dù mock server nằm ở localhost.
 
 ```bash
-CROC_DO_CHECK=1 croc send file.txt
+export CROC_NO_UPDATE_CHECK=1
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy SOCKS5_PROXY
+go test -buildvcs=false -count=1 ./src/adaptivevideo ./src/croc ./src/cli ./src/message
+go test -buildvcs=false -count=1 .
+go test -buildvcs=false -race -count=1 ./src/adaptivevideo ./src/croc -run 'TestSelect|TestParseMP4|TestVideo'
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o ../croc-adaptive.exe .
 ```
 
-The override waits up to two seconds for the request and reports when the current
-version is already latest or when the check is unavailable. It does not display
-a notice under `--quiet` or turn update-check failures into errors.
+Cờ `-buildvcs=false` cho phép build từ source ZIP trong thư mục không có metadata Git. Dùng lệnh demo trong [README](../README.md) để kiểm tra việc chọn chất lượng. Không thêm cờ `--debug` cho demo loopback. Debug upstream có thêm truy vấn public IP ngoài mạng LAN.
 
-Set `CROC_DO_CHECK=0` to skip the check entirely. Croc then makes no release
-request, neither reads nor writes `version-check.json`, and shows no update
-notice:
+## Thử tích hợp và đối chiếu với Croc gốc
+
+Các lệnh dưới đây chạy tại gốc repo. Tạo binary đối chứng Croc v11.6.6 khi muốn thử khả năng tương thích với peer gốc hoặc so sánh với cách gửi cố định.
 
 ```bash
-CROC_DO_CHECK=0 croc send file.txt
+git clone --branch v11.6.6 --single-branch https://github.com/schollz/croc.git ../baseline
+test "$(git -C ../baseline rev-parse HEAD)" = 440ed73844fd02a8185e6e6d2d4cd772388587dc
+(cd ../baseline && go build -buildvcs=false -o ../croc-baseline .)
+go build -buildvcs=false -o ../croc-adaptive .
+bash scripts/adaptive-video/fixtures.sh ../video-fixtures
+
+python3 scripts/adaptive-video/demo.py --baseline ../croc-baseline \
+  --adaptive ../croc-adaptive --fixtures ../video-fixtures \
+  --output integration.csv --suite integration --workers 3 --timeout 42
+
+python3 scripts/adaptive-video/demo.py --baseline ../croc-baseline \
+  --adaptive ../croc-adaptive --fixtures ../video-fixtures \
+  --output benchmark.csv --suite benchmark --repeats 5 --workers 10 --timeout 125
+
+python3 scripts/adaptive-video/summarize.py benchmark.csv
 ```
 
-`--no-update-check` and `CROC_NO_UPDATE_CHECK=1` also skip it, and `--remember` on
-a regular send or receive keeps that setting. `CROC_DO_CHECK=1` forces a check over
-any of them.
+Mỗi lượt có một relay gốc, hai CLI, một thư mục đối chứng rỗng và một mã riêng. Script đợi cả hai cổng, giới hạn thời gian, dọn tiến trình, đối chiếu chính xác tên và SHA-256. Script chỉ lưu dữ liệu đã lọc. Các ca thất bại được giữ nguyên trong CSV.
 
-`croc update --check` is unaffected.
+Trong lượt demo, kiểm tra cột `height`, `sha_match` và `ready_within_deadline`. Trong lượt tích hợp, `passed=True` cho biết ca đạt đúng kỳ vọng, kể cả khi ca đó yêu cầu phiên báo lỗi. Ca `slowdown` cho thấy ETA ban đầu có thể lệch khi tốc độ thay đổi giữa phiên.
 
-## Local Reconnect Interruptions
+## Dấu hiệu không có payload khi từ chối
 
-Use three terminals to run a local relay, receiver, and sender. From the repository root, build the binary and start a local relay in the first terminal:
-
-```bash
-go build -o ./bin/croc && ./bin/croc relay --ports 9009,9010
-```
-
-In the second terminal, start the receiver:
-
-```bash
-rm -rf croc-big.bin && ./bin/croc --debug --yes --overwrite --relay 127.0.0.1:9009 test-reconnect-code
-```
-
-In the third terminal, start the sender:
-
-```bash
-./bin/croc --relay 127.0.0.1:9009 --throttleUpload 512K --no-compress send --code test-reconnect-code --no-local --no-multi /tmp/croc-big.bin
-```
-
-While the transfer is running, interrupt one active socket.
-
-For a data-channel drop:
-
-```bash
-sudo ss -K dst 127.0.0.1 dport = :9010
-```
-
-For a control-channel drop:
-
-```bash
-sudo ss -K dst 127.0.0.1 dport = :9009
-```
-
-If no connection is killed, inspect the active croc sockets and adjust the port:
-
-```bash
-sudo ss -tnp | grep croc
-```
+Proxy đếm byte TCP ứng dụng từ sender đến relay qua cổng data riêng. Lượt từ chối chỉ có vài trăm byte điều khiển mở kênh của Croc, dưới ngưỡng 4 KiB của harness. Cổng control vẫn mang mẫu probe. Thư mục nhận rỗng và cả hai CLI kết thúc có lỗi. Ngưỡng quan sát này áp dụng cho các fixture đều lớn hơn 700 KB và kịch bản test hiện tại.

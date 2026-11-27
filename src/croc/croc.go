@@ -3297,6 +3297,9 @@ func (c *Client) processMessage(payload []byte, attempt *transferAttemptState) (
 				return
 			}
 			if errInput != nil || (choice != "" && choice != "y" && choice != "yes") {
+				if c.Options.VideoSend != nil {
+					return true, videoFailure("sender declined the selected video")
+				}
 				err = message.Send(c.connection(0), c.Key, message.Message{
 					Type:    message.TypeError,
 					Message: "refusing files",
