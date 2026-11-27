@@ -1,0 +1,12 @@
+case,profile,mbps,method,repeat,deadline_s,minimum,height,late_offer,probe_s,raw_Bps,safe_Bps,eta_s,receive_phase_s,budget_elapsed_s,eta_error_s,ready_within_deadline,sha256,sha_match,files,control_upload_bytes,data_upload_bytes,sender_exit,receiver_exit,status,passed
+no-fit,slow,1.2,adaptive,1,4,0,,,1.773011018,147852.437,118281.95,,,1.7987580450001133,,False,,False,,264951,362,1,1,no variant fits the video deadline,True
+no-quality,fast,25,adaptive,1,20,2160,,,0.13440838500000002,1950354.511,1560283.609,,,0.15282748399999946,,False,,False,,264951,362,1,1,no variant meets the receiver's minimum height,True
+late-accept,fast,25,adaptive,1,1,360,360,true,0.134553769,1948247.172,1558597.738,2.171215137,1.2165394900000592,1.398014762999992,-0.9546756469999407,False,291fdbe07b1ad500b257aac6f8a6346c3a22175321dd2e38a1d50971bc5fd4e3,True,video-360.mp4,265696,3388989,0,0,ok,True
+late-refuse,fast,25,adaptive,1,1,360,360,true,0.130294099,2011940.694,1609552.555,2.102479344,,0.18281703599996035,,False,,False,,265688,362,1,1,receiver declined the selected video,True
+late-empty,fast,25,adaptive,1,1,360,360,true,0.135052582,1941051.375,1552841.1,2.179264189,,0.21534342900008596,,False,,False,,265684,362,1,1,receiver declined the selected video,True
+old-peer,fast,25,adaptive,1,20,0,,,,,,,,,,False,,False,,1998,362,1,1,incompatible peer,True
+mixed,fast,25,mixed,1,20,0,144,,,,,,0.3124608729999636,0.3124608729999636,,True,18e79aa697c789b2e8b4429d42a973a2fe45c267b6faf862802d6cffaea64dc5,True,video-144.mp4,2678,719133,0,0,ok,True
+probe-timeout,fast,25,adaptive,1,2,0,,,,,,,,,,False,,False,,18249,801,1,1,probe timed out,True
+disconnect,fast,25,adaptive,1,20,0,1080,false,0.090386832,2900245.469,2320196.376,5.182222991,0.06683094200002415,0.20307943399984651,,False,,False,video-1080.mp4,265574,131875,1,1,transfer disconnected,True
+cancel,fast,25,adaptive,1,20,0,1080,false,0.127243847,2060170.344,1648136.275,7.295376714,0.046516311999994286,0.22040648600000168,,False,,False,video-1080.mp4,265572,131434,1,1,transfer canceled,True
+slowdown,medium,5,adaptive,1,20,0,360,false,0.42831161100000004,612040.377,489632.302,6.911412886,22.087696464000146,22.56269638200024,15.176283578000145,False,291fdbe07b1ad500b257aac6f8a6346c3a22175321dd2e38a1d50971bc5fd4e3,True,video-360.mp4,265691,3388989,0,0,ok,True
